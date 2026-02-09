@@ -1,0 +1,51 @@
+{
+  "name": "rbac-api",
+  "version": "2.0.0",
+  "description": "RBAC API with Express.js, TypeORM, and Opaque Tokens (TypeScript)",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts",
+    "dev:watch": "nodemon --exec ts-node src/server.ts",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/config/typeorm.ts src/database/migrations/auto-generated-migration",
+    "migration:create": "typeorm-ts-node-commonjs migration:create src/database/migrations/create-migration",
+    "migration:run": "ts-node run-migrations.ts",
+    "migration:revert": "ts-node revert-migrations.ts",
+    "seed:run": "ts-node src/database/seed-runner.ts",
+    "seed": "ts-node src/database/seed-runner.ts"
+  },
+  "keywords": [
+    "rbac",
+    "express",
+    "postgresql",
+    "authentication",
+    "typeorm",
+    "opaque-tokens"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "pg": "^8.11.3",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^0.3.20",
+    "typeorm-cursor-pagination": "^0.10.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^10.2.0",
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/faker": "^6.6.8",
+    "@types/node": "^20.19.32",
+    "nodemon": "^3.0.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

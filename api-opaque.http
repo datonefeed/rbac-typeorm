@@ -1,0 +1,122 @@
+### API Testing với Opaque Tokens
+### =================================
+
+@baseUrl = http://localhost:3000/api
+@token = 
+
+### 1. Login (Get Opaque Token)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "admin1",
+  "password": "123456"
+}
+
+### 2. Get Current User Profile
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+### 3. Logout (Revoke Token)
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{token}}
+
+### 4. Try using revoked token (should fail)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+### ===================================
+### ADMIN ENDPOINTS
+### ===================================
+
+### 5. List All Users
+GET {{baseUrl}}/admin/users
+Authorization: Bearer {{token}}
+
+### 6. Assign Roles to User (Revokes all user's tokens)
+POST {{baseUrl}}/admin/users/2/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roleIds": [2, 3]
+}
+
+### 7. Assign Companies to User (Revokes all user's tokens)
+POST {{baseUrl}}/admin/users/2/companies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "companyIds": [1, 2]
+}
+
+### 8. Disable User Account (Revokes all user's tokens immediately)
+PATCH {{baseUrl}}/admin/users/2/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": false
+}
+
+### 9. Enable User Account
+PATCH {{baseUrl}}/admin/users/2/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": true
+}
+
+### 10. Change User Password (Revokes all user's tokens)
+PATCH {{baseUrl}}/admin/users/2/password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "newPassword": "newpass123"
+}
+
+### 11. List All Roles
+GET {{baseUrl}}/admin/roles
+Authorization: Bearer {{token}}
+
+### 12. List All Permissions
+GET {{baseUrl}}/admin/permissions
+Authorization: Bearer {{token}}
+
+### 13. Map Permissions to Role (Revokes tokens for all users with this role)
+POST {{baseUrl}}/admin/roles/2/permissions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "permissionIds": [1, 2, 3, 4]
+}
+
+### ===================================
+### PROJECT ENDPOINTS
+### ===================================
+
+### 14. List Projects
+GET {{baseUrl}}/projects
+Authorization: Bearer {{token}}
+
+### ===================================
+### NOTES
+### ===================================
+# Token Revocation Scenarios:
+# 1. Logout - Token is hard deleted from database
+# 2. Assign Roles - All user's tokens are hard deleted (force re-login for new permissions)
+# 3. Assign Companies - All user's tokens are hard deleted (force re-login for new companies)
+# 4. Disable User - All user's tokens are hard deleted immediately
+# 5. Change Password - All user's tokens are hard deleted (force re-login with new password)
+# 6. Map Role Permissions - All tokens for users with that role are hard deleted
+#
+# Opaque Token Features:
+# - 64-character random hex string (crypto.randomBytes)
+# - Stored in database with user_id, expires_at, ip_address, user_agent
+# - 24-hour expiration
+# - DB lookup on every request (includes abilities)
+# - Hard delete for revocation (no soft delete)

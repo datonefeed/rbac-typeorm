@@ -1,0 +1,134 @@
+### Auth Module - Production Testing
+
+@baseUrl = http://localhost:3000
+@token = 
+
+### 1. Login - Valid Credentials (admin)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "admin",
+  "password": "admin123"
+}
+
+### 2. Login - Valid Credentials by Email
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "admin@company.com",
+  "password": "admin123"
+}
+
+### 3. Login - Missing Fields
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "admin"
+}
+
+### 4. Login - Invalid Credentials
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "admin",
+  "password": "wrongpassword"
+}
+
+### 5. Login - Non-existent User
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "nonexistent",
+  "password": "password123"
+}
+
+### 6. Get Current User (Me) - With Valid Token
+# First login and copy the accessToken, then paste below
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 7. Get Current User - Without Token
+GET {{baseUrl}}/api/auth/me
+
+### 8. Get Current User - Invalid Token
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer invalid_token_here
+
+### 9. Logout - With Valid Token
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 10. Logout - Without Token
+POST {{baseUrl}}/api/auth/logout
+
+### 11. Logout - Idempotent Test (logout twice with same token)
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+###
+### Expected Response Formats:
+###
+
+# Login Success:
+# {
+#   "success": true,
+#   "message": "Đăng nhập thành công",
+#   "data": {
+#     "accessToken": "f3a8b2c1-4d5e-6f7g-8h9i-0j1k2l3m4n5o",
+#     "tokenType": "Bearer",
+#     "expiresAt": "2026-02-07T10:30:00.000Z",
+#     "user": {
+#       "id": 1,
+#       "userName": "admin",
+#       "fullName": "Administrator",
+#       "email": "admin@company.com",
+#       "isActive": true,
+#       "roles": [
+#         { "id": 1, "name": "DIRECTOR", "description": "..." }
+#       ],
+#       "permissions": [
+#         { "id": 1, "name": "PRJ_VIEW", "description": "..." }
+#       ],
+#       "companies": [
+#         { "id": 1, "code": "COMP001", "name": "Company A" }
+#       ]
+#     },
+#     "abilities": [
+#       "DIRECTOR",
+#       "company:1",
+#       "company:2",
+#       "permission:PRJ_CREATE",
+#       "permission:PRJ_VIEW"
+#     ]
+#   }
+# }
+
+# Me Success:
+# {
+#   "success": true,
+#   "data": {
+#     "id": 1,
+#     "userName": "admin",
+#     "fullName": "Administrator",
+#     "email": "admin@company.com",
+#     "isActive": true,
+#     "abilities": ["DIRECTOR", "company:1", "permission:PRJ_VIEW"]
+#   }
+# }
+
+# Logout Success:
+# {
+#   "success": true,
+#   "message": "Đăng xuất thành công"
+# }
+
+# Error Response:
+# {
+#   "success": false,
+#   "message": "Invalid credentials"
+# }
