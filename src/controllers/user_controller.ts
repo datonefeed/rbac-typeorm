@@ -9,7 +9,7 @@ import {
   assignCompaniesToUser,
   changeUserPassword,
 } from '../services/user_service';
-import { toUserListDTOs, toUserDetailDTO, toSimpleUserDTO } from '../dto/user_dto';
+
 import {
   UserListQueryParams,
   CreateUserInput,
@@ -17,7 +17,6 @@ import {
   AssignRolesInput,
   AssignCompaniesInput,
 } from '../types/user_types';
-import { loadUserFullData } from '../utils/user_loaders';
 
 /**
  * User Controller
@@ -95,12 +94,10 @@ export async function getUserById(req: Request, res: Response): Promise<Response
       });
     }
 
-    const { user, roles, permissions, companies } = result;
-    const userDetail = toUserDetailDTO(user, roles, permissions, companies);
-
+    // Service already returns serialized data via UserSerializer
     return res.status(200).json({
       success: true,
-      data: userDetail,
+      data: result,
     });
   } catch (error) {
     console.error('Get user detail error:', error);
@@ -121,14 +118,11 @@ export async function createUserHandler(req: Request, res: Response): Promise<Re
 
     const user = await createUser(input);
 
-    // Load full data để trả về
-    const { roles, permissions, companies } = await loadUserFullData(user.id);
-    const userDetail = toUserDetailDTO(user, roles, permissions, companies);
-
+    // Service already returns serialized data via UserSerializer
     return res.status(201).json({
       success: true,
       message: 'User created successfully',
-      data: userDetail,
+      data: user,
     });
   } catch (error: any) {
     console.error('Create user error:', error);
@@ -165,14 +159,11 @@ export async function updateUserHandler(req: Request, res: Response): Promise<Re
 
     const user = await updateUser(userId, input);
 
-    // Load full data để trả về
-    const { roles, permissions, companies } = await loadUserFullData(user.id);
-    const userDetail = toUserDetailDTO(user, roles, permissions, companies);
-
+    // Service already returns serialized data via UserSerializer
     return res.status(200).json({
       success: true,
       message: 'User updated successfully',
-      data: userDetail,
+      data: user,
     });
   } catch (error: any) {
     console.error('Update user error:', error);
