@@ -1,0 +1,476 @@
+### User Module - API Testing
+### Complete CRUD operations and user management
+
+@baseUrl = http://localhost:3000
+@token = YOUR_ACCESS_TOKEN_HERE
+
+###############################################
+### AUTHENTICATION - Get Token First
+###############################################
+
+### Login to get token
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "admin",
+  "password": "admin123"
+}
+
+###############################################
+### 1. LIST USERS - GET /api/users
+###############################################
+
+### 1.1. Get first page (default 20 users, DESC order)
+# Note: Use /api/users (not /api/admin/users)
+GET {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+
+### 1.2. Get with custom limit
+GET {{baseUrl}}/api/users?limit=10
+Authorization: Bearer {{token}}
+
+### 1.3. Search by username/fullName/email
+GET {{baseUrl}}/api/users?search=john
+Authorization: Bearer {{token}}
+
+### 1.4. Filter by isActive
+GET {{baseUrl}}/api/users?isActive=true
+Authorization: Bearer {{token}}
+
+### 1.5. Filter by roleId
+GET {{baseUrl}}/api/users?roleId=1
+Authorization: Bearer {{token}}
+
+### 1.6. Filter by companyId
+GET {{baseUrl}}/api/users?companyId=1
+Authorization: Bearer {{token}}
+
+### 1.7. Combined filters
+GET {{baseUrl}}/api/users?search=admin&isActive=true&roleId=1&limit=5
+Authorization: Bearer {{token}}
+
+### 1.8. Order ASC
+GET {{baseUrl}}/api/users?order=ASC&limit=10
+Authorization: Bearer {{token}}
+
+### 1.9. Pagination - Next page (use afterCursor from previous response)
+GET {{baseUrl}}/api/users?limit=5&afterCursor=WyJpZCIsMTBd
+Authorization: Bearer {{token}}
+
+### 1.10. Pagination - Previous page (use beforeCursor)
+GET {{baseUrl}}/api/users?limit=5&beforeCursor=WyJpZCIsMTVd
+Authorization: Bearer {{token}}
+
+###############################################
+### 2. GET USER DETAIL - GET /api/users/:id
+###############################################
+
+### 2.1. Get user detail by ID (valid user)
+GET {{baseUrl}}/api/users/1
+Authorization: Bearer {{token}}
+
+### 2.2. Get non-existent user (should return 404)
+GET {{baseUrl}}/api/users/99999
+Authorization: Bearer {{token}}
+
+### 2.3. Get user detail with invalid ID format (should return 400)
+GET {{baseUrl}}/api/users/abc
+Authorization: Bearer {{token}}
+
+###############################################
+### 3. CREATE USER - POST /api/users
+###############################################
+
+### 3.1. Create user with minimum required fields
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userName": "testuser001",
+  "email": "testuser001@example.com",
+  "password": "Test123456"
+}
+
+### 3.2. Create user with full fields + roles + companies
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userName": "testuser002",
+  "fullName": "Test User 002",
+  "email": "testuser002@example.com",
+  "password": "Test123456",
+  "isActive": true,
+  "roleIds": [1, 2],
+  "companyIds": [1]
+}
+
+### 3.3. Create user with duplicate userName (should fail)
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userName": "admin",
+  "email": "newemail@example.com",
+  "password": "Test123456"
+}
+
+### 3.4. Create user with duplicate email (should fail)
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userName": "newusername",
+  "email": "admin@company.com",
+  "password": "Test123456"
+}
+
+### 3.5. Create user with invalid roleIds (should fail)
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userName": "testuser003",
+  "email": "testuser003@example.com",
+  "password": "Test123456",
+  "roleIds": [99999]
+}
+
+### 3.6. Create user with invalid companyIds (should fail)
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userName": "testuser004",
+  "email": "testuser004@example.com",
+  "password": "Test123456",
+  "companyIds": [99999]
+}
+
+### 3.7. Create user with missing required fields (should fail)
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userName": "testuser005"
+}
+
+### 3.8. Create user with weak password (should fail if validation enabled)
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userName": "testuser006",
+  "email": "testuser006@example.com",
+  "password": "123"
+}
+
+###############################################
+### 4. UPDATE USER - PUT /api/users/:id
+###############################################
+
+### 4.1. Update user basic info
+PUT {{baseUrl}}/api/users/2
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fullName": "Updated Full Name",
+  "email": "updatedemail@example.com"
+}
+
+### 4.2. Update userName
+PUT {{baseUrl}}/api/users/2
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userName": "newusername001"
+}
+
+### 4.3. Update isActive to false (deactivate user)
+PUT {{baseUrl}}/api/users/2
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": false
+}
+
+### 4.4. Update image
+PUT {{baseUrl}}/api/users/2
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "image": "https://example.com/avatar.jpg"
+}
+
+### 4.5. Update all fields at once
+PUT {{baseUrl}}/api/users/2
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userName": "updateduser",
+  "fullName": "Updated User Full Name",
+  "email": "updated@example.com",
+  "isActive": true,
+  "image": "https://example.com/new-avatar.jpg"
+}
+
+### 4.6. Update with duplicate userName (should fail)
+PUT {{baseUrl}}/api/users/2
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userName": "admin"
+}
+
+### 4.7. Update non-existent user (should return 404)
+PUT {{baseUrl}}/api/users/99999
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fullName": "Will Not Work"
+}
+
+###############################################
+### 5. DELETE USER - DELETE /api/users/:id
+###############################################
+
+### 5.1. Soft delete user (set isActive = false)
+DELETE {{baseUrl}}/api/users/3
+Authorization: Bearer {{token}}
+
+### 5.2. Delete non-existent user (should return 404)
+DELETE {{baseUrl}}/api/users/99999
+Authorization: Bearer {{token}}
+
+### 5.3. Delete with invalid ID format (should return 400)
+DELETE {{baseUrl}}/api/users/abc
+Authorization: Bearer {{token}}
+
+###############################################
+### 6. ASSIGN ROLES - POST /api/users/:id/roles
+###############################################
+
+### 6.1. Assign single role to user
+POST {{baseUrl}}/api/users/2/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roleIds": [1]
+}
+
+### 6.2. Assign multiple roles to user
+POST {{baseUrl}}/api/users/2/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roleIds": [1, 2, 3]
+}
+
+### 6.3. Replace existing roles (deactivate old, assign new)
+POST {{baseUrl}}/api/users/2/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roleIds": [2]
+}
+
+### 6.4. Assign invalid roleIds (should fail)
+POST {{baseUrl}}/api/users/2/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roleIds": [99999]
+}
+
+### 6.5. Assign to non-existent user (should return 404)
+POST {{baseUrl}}/api/users/99999/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roleIds": [1]
+}
+
+### 6.6. Empty roleIds array (should fail or remove all roles)
+POST {{baseUrl}}/api/users/2/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roleIds": []
+}
+
+###############################################
+### 7. ASSIGN COMPANIES - POST /api/users/:id/companies
+###############################################
+
+### 7.1. Assign single company to user
+POST {{baseUrl}}/api/users/2/companies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "companyIds": [1]
+}
+
+### 7.2. Assign multiple companies to user
+POST {{baseUrl}}/api/users/2/companies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "companyIds": [1, 2]
+}
+
+### 7.3. Replace existing companies
+POST {{baseUrl}}/api/users/2/companies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "companyIds": [2]
+}
+
+### 7.4. Assign invalid companyIds (should fail)
+POST {{baseUrl}}/api/users/2/companies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "companyIds": [99999]
+}
+
+### 7.5. Assign to non-existent user (should return 404)
+POST {{baseUrl}}/api/users/99999/companies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "companyIds": [1]
+}
+
+###############################################
+### 8. CHANGE PASSWORD - PATCH /api/users/:id/password
+###############################################
+
+### 8.1. Change user password (admin action)
+PATCH {{baseUrl}}/api/users/2/password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "newPassword": "NewPassword123"
+}
+
+### 8.2. Change password with weak password (should fail if validation enabled)
+PATCH {{baseUrl}}/api/users/2/password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "newPassword": "123"
+}
+
+### 8.3. Change password for non-existent user (should return 404)
+PATCH {{baseUrl}}/api/users/99999/password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "newPassword": "NewPassword123"
+}
+
+### 8.4. Change password with missing field (should fail)
+PATCH {{baseUrl}}/api/users/2/password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+}
+
+###############################################
+### 9. UNAUTHORIZED REQUESTS (No Token)
+###############################################
+
+### 9.1. List users without token (should return 401)
+GET {{baseUrl}}/api/users
+
+### 9.2. Create user without token (should return 401)
+POST {{baseUrl}}/api/users
+Content-Type: application/json
+
+{
+  "userName": "testuser",
+  "email": "test@example.com",
+  "password": "Test123456"
+}
+
+### 9.3. Update user without token (should return 401)
+PUT {{baseUrl}}/api/users/1
+Content-Type: application/json
+
+{
+  "fullName": "New Name"
+}
+
+###############################################
+### 10. EDGE CASES & PERFORMANCE
+###############################################
+
+### 10.1. Get maximum limit (100 users)
+GET {{baseUrl}}/api/users?limit=100
+Authorization: Bearer {{token}}
+
+### 10.2. Get with limit > 100 (should cap at 100 or return error)
+GET {{baseUrl}}/api/users?limit=200
+Authorization: Bearer {{token}}
+
+### 10.3. Search with empty string
+GET {{baseUrl}}/api/users?search=
+Authorization: Bearer {{token}}
+
+### 10.4. Search with special characters
+GET {{baseUrl}}/api/users?search=%@#$
+Authorization: Bearer {{token}}
+
+### 10.5. Filter with multiple roleIds (if supported)
+GET {{baseUrl}}/api/users?roleId=1&roleId=2
+Authorization: Bearer {{token}}
+
+### 10.6. Combined filters stress test
+GET {{baseUrl}}/api/users?search=test&isActive=true&roleId=1&companyId=1&order=ASC&limit=50
+Authorization: Bearer {{token}}
+
+###############################################
+### NOTES
+###############################################
+
+# 1. Update @token variable after successful login
+# 2. Replace user IDs (1, 2, 3, etc.) with actual IDs from your database
+# 3. Replace role/company IDs with valid IDs from your system
+# 4. Check response format matches your API design
+# 5. Verify token revocation after role/company/password changes
+# 6. Test pagination cursors are properly encoded/decoded
+# 7. Ensure proper error messages for validation failures
+
+###############################################
