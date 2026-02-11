@@ -8,6 +8,7 @@ import { initializeDatabase } from './config/typeorm';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
 import projectRoutes from './routes/projects';
+import userRoutes from './routes/user_routes';
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.get('/health', (req: Request, res: Response) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 
 // 404 handler
