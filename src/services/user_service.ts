@@ -1,9 +1,5 @@
 import bcrypt from 'bcrypt';
-import { Brackets, In } from 'typeorm';
-import {
-  buildPaginator,
-  PagingResult,
-} from 'typeorm-cursor-pagination';
+import { In } from 'typeorm';
 import { AppDataSource } from '../config/typeorm';
 import { User } from '../models/user';
 import { Role } from '../models/role';
@@ -12,6 +8,12 @@ import { UserRole } from '../models/user_role';
 import { UserCompany } from '../models/user_company';
 import { revokeAllUserTokens } from '../utils/token_utils';
 import { loadUserFullData } from '../utils/user_loaders';
+import { applyFilters } from '../utils/query_builder';
+import { UserSerializer } from '../serializers/user_serializer';
+import {
+  createPaginationQuery,
+  executeCursorPagination,
+} from '../utils/pagination_helper';
 import {
   UserListQueryParams,
   CursorPaginationResult,
@@ -38,155 +40,85 @@ export async function listUsers(
 
   const userRepo = AppDataSource.getRepository(User);
 
-  // chỉ query để lấy user IDs
-  let queryBuilder = userRepo
-    .createQueryBuilder('user')
-    .select(['user.id', 'user.createdAt']);
+  // Create base query - only select IDs and createdAt
+  let queryBuilder = createPaginationQuery(userRepo, 'user');
 
-  // Filter: search (ILIKE userName/fullName/email)
-  if (search) {
-    queryBuilder = queryBuilder.andWhere(
-      new Brackets(qb => {
-        qb.where('user.userName ILIKE :search', { search: `%${search}%` })
-          .orWhere('user.fullName ILIKE :search', { search: `%${search}%` })
-          .orWhere('user.email ILIKE :search', { search: `%${search}%` });
-      })
-    );
-  }
-
-  if (isActive !== undefined) {
-    queryBuilder = queryBuilder.andWhere('user.isActive = :isActive', { isActive });
-  }
-
-  // Filter: roleId (EXISTS subquery - không join, chỉ filter)
-  if (roleId) {
-    queryBuilder = queryBuilder.andWhere(qb => {
-      const subQuery = qb
-        .subQuery()
-        .select('1')
-        .from(UserRole, 'ur')
-        .where('ur.userId = user.id')
-        .andWhere('ur.roleId = :roleId', { roleId })
-        .andWhere('ur.isActive = true')
-        .getQuery();
-      return `EXISTS ${subQuery}`;
-    });
-  }
-
-  // Filter: companyId (EXISTS subquery)
-  if (companyId) {
-    queryBuilder = queryBuilder.andWhere(qb => {
-      const subQuery = qb
-        .subQuery()
-        .select('1')
-        .from(UserCompany, 'uc')
-        .where('uc.userId = user.id')
-        .andWhere('uc.companyId = :companyId', { companyId })
-        .andWhere('uc.isActive = true')
-        .getQuery();
-      return `EXISTS ${subQuery}`;
-    });
-  }
-
-  // Cursor pagination config
-  const paginator = buildPaginator({
-    entity: User,
-    alias: 'user',
-    paginationKeys: ['id'],
-    query: {
-      limit,
-      order: order,
-      afterCursor,
-      beforeCursor,
+  // Apply filters
+  queryBuilder = applyFilters(queryBuilder, {
+    search: {
+      fields: ['user.userName', 'user.fullName', 'user.email'],
+      value: search,
     },
+    boolean: [
+      { field: 'user.isActive', value: isActive },
+    ],
+    relationExists: [
+      {
+        relationTable: UserRole,
+        relationAlias: 'ur',
+        mainTableAlias: 'user',
+        conditions: [
+          { field: 'ur.roleId', paramName: 'roleId', value: roleId },
+          { field: 'ur.isActive', paramName: 'urActive', value: roleId ? true : undefined },
+        ],
+      },
+      {
+        relationTable: UserCompany,
+        relationAlias: 'uc',
+        mainTableAlias: 'user',
+        conditions: [
+          { field: 'uc.companyId', paramName: 'companyId', value: companyId },
+          { field: 'uc.isActive', paramName: 'ucActive', value: companyId ? true : undefined },
+        ],
+      },
+    ],
   });
 
-  // Execute pagination - lấy user IDs
-  const paginationResult: PagingResult<User> = await paginator.paginate(queryBuilder);
-
-  if (paginationResult.data.length === 0) {
-    return {
-      data: [],
-      cursor: {
-        afterCursor: null,
-        beforeCursor: null,
-      },
-    };
-  }
-
-  // Step 2: Extract userIds (giữ đúng thứ tự của pagination)
-  const userIds = paginationResult.data.map(u => u.id);
-
-  // Step 3: Hydrate relations với find() + relationLoadStrategy: 'query'
-  const usersWithRelations = await userRepo.find({
-    where: { id: In(userIds) },
-    relationLoadStrategy: 'query',
-    relations: {
-      userRoles: {
-        role: true,
-      },
-      userCompanies: {
-        company: true,
-      },
-    },
-    select: {
-      id: true,
-      userName: true,
-      fullName: true,
-      email: true,
-      isActive: true,
-      image: true,
-      createdAt: true,
-      userRoles: {
-        id: true,
-        isActive: true,
-        role: {
-          id: true,
-          roleName: true,
-          
-          description: true,
+  // Execute pagination with relation hydration
+  return await executeCursorPagination(
+    queryBuilder,
+    userRepo,
+    { limit, afterCursor, beforeCursor, order },
+    {
+      relations: {
+        userRoles: {
+          role: true,
+        },
+        userCompanies: {
+          company: true,
         },
       },
-      userCompanies: {
+      select: {
         id: true,
+        userName: true,
+        fullName: true,
+        email: true,
         isActive: true,
-        company: {
+        image: true,
+        createdAt: true,
+        userRoles: {
           id: true,
-          companyName: true,
-          companyCode: true,
+          isActive: true,
+          role: {
+            id: true,
+            roleName: true,
+            description: true,
+          },
+        },
+        userCompanies: {
+          id: true,
+          isActive: true,
+          company: {
+            id: true,
+            companyName: true,
+            companyCode: true,
+          },
         },
       },
     },
-  });
-
-  // Step 4: Transform userRoles/userCompanies thành roles/companies và filter active
-  const transformedUsers = usersWithRelations.map(user => ({
-    id: user.id,
-    userName: user.userName,
-    fullName: user.fullName,
-    email: user.email,
-    isActive: user.isActive,
-    image: user.image,
-    createdAt: user.createdAt,
-    roles: user.userRoles
-      ?.filter(ur => ur.isActive && ur.role)
-      .map(ur => ur.role) || [],
-    companies: user.userCompanies
-      ?.filter(uc => uc.isActive && uc.company)
-      .map(uc => uc.company) || [],
-  }));
-
-  // Step 5: Reorder theo userIds (vì find(In(...)) không đảm bảo thứ tự)
-  const userMap = new Map(transformedUsers.map(u => [u.id, u]));
-  const usersOrdered = userIds.map(id => userMap.get(id)).filter(Boolean);
-
-  return {
-    data: usersOrdered,
-    cursor: {
-      afterCursor: paginationResult.cursor.afterCursor,
-      beforeCursor: paginationResult.cursor.beforeCursor,
-    },
-  };
+    // Transform using UserSerializer
+    UserSerializer.toListResponse
+  );
 }
 
 
@@ -202,15 +134,14 @@ export async function getUserDetail(userId: number) {
     return null;
   }
 
-  // Load relations: roles + permissions + companies
   const { roles, permissions, companies } = await loadUserFullData(userId);
 
-  return {
+  return UserSerializer.toDetailResponse({
     user,
     roles,
     permissions,
     companies,
-  };
+  });
 }
 
  //POST /users - Create new user
@@ -219,75 +150,87 @@ export async function createUser(input: CreateUserInput) {
   const userRepo = AppDataSource.getRepository(User);
   const roleRepo = AppDataSource.getRepository(Role);
   const companyRepo = AppDataSource.getRepository(Company);
+  const userRoleRepo = AppDataSource.getRepository(UserRole);
+  const userCompanyRepo = AppDataSource.getRepository(UserCompany);
 
-  // Check unique userName
-  const existingUserName = await userRepo.findOne({
-    where: { userName: input.userName },
-  });
+  // Parallel validation: uniqueness + hash password + validate relations
+  const [existingUserName, existingEmail, hashedPassword, validatedRoles, validatedCompanies] = await Promise.all([
+    // Check userName uniqueness
+    userRepo.findOne({ where: { userName: input.userName } }),
+    
+    // Check email uniqueness
+    userRepo.findOne({ where: { email: input.email } }),
+    
+    // Hash password in parallel
+    bcrypt.hash(input.password, 10),
+    
+    // Validate roles if provided
+    input.roleIds && input.roleIds.length > 0
+      ? roleRepo.findBy({ id: In(input.roleIds), isActive: true })
+      : Promise.resolve([]),
+    
+    // Validate companies if provided
+    input.companyIds && input.companyIds.length > 0
+      ? companyRepo.findBy({ id: In(input.companyIds), isActive: true })
+      : Promise.resolve([]),
+  ]);
+
+  // Validation checks
   if (existingUserName) {
     throw new Error('userName already exists');
   }
-
-  // Check unique email
-  const existingEmail = await userRepo.findOne({
-    where: { email: input.email },
-  });
   if (existingEmail) {
     throw new Error('email already exists');
   }
+  if (input.roleIds && input.roleIds.length > 0 && validatedRoles.length !== input.roleIds.length) {
+    throw new Error('Some roleIds are invalid or inactive');
+  }
+  if (input.companyIds && input.companyIds.length > 0 && validatedCompanies.length !== input.companyIds.length) {
+    throw new Error('Some companyIds are invalid or inactive');
+  }
 
-  // Hash password
-  const hashedPassword = await bcrypt.hash(input.password, 10);
-
-  // Transaction: create user + assign roles/companies
-  return await AppDataSource.transaction(async manager => {
-    // Create user
-    const user = manager.create(User, {
-      userName: input.userName,
-      fullName: input.fullName || undefined,
-      email: input.email,
-      password: hashedPassword,
-      isActive: input.isActive !== undefined ? input.isActive : true,
-    });
-
-    await manager.save(user);
-
-    // Assign roles (if provided)
-    if (input.roleIds && input.roleIds.length > 0) {
-      const roles = await manager.findBy(Role, { id: input.roleIds as any, isActive: true });
-      if (roles.length !== input.roleIds.length) {
-        throw new Error('Some roleIds are invalid or inactive');
-      }
-
-      const userRoles = input.roleIds.map(roleId =>
-        manager.create(UserRole, {
-          userId: user.id,
-          roleId,
-          isActive: true,
-        })
-      );
-      await manager.save(userRoles);
-    }
-
-    // Assign companies (if provided)
-    if (input.companyIds && input.companyIds.length > 0) {
-      const companies = await manager.findBy(Company, { id: input.companyIds as any, isActive: true });
-      if (companies.length !== input.companyIds.length) {
-        throw new Error('Some companyIds are invalid or inactive');
-      }
-
-      const userCompanies = input.companyIds.map(companyId =>
-        manager.create(UserCompany, {
-          userId: user.id,
-          companyId,
-          isActive: true,
-        })
-      );
-      await manager.save(userCompanies);
-    }
-
-    return user;
+  // Create user
+  const user = userRepo.create({
+    userName: input.userName,
+    fullName: input.fullName || undefined,
+    email: input.email,
+    password: hashedPassword,
+    isActive: input.isActive !== undefined ? input.isActive : true,
   });
+
+  await userRepo.save(user);
+
+  // Parallel insert userRoles and userCompanies
+  const insertPromises: Promise<any>[] = [];
+
+  if (input.roleIds && input.roleIds.length > 0) {
+    const userRoles = userRoleRepo.create(
+      input.roleIds.map(roleId => ({
+        userId: user.id,
+        roleId,
+        isActive: true,
+      }))
+    );
+    insertPromises.push(userRoleRepo.save(userRoles));
+  }
+
+  if (input.companyIds && input.companyIds.length > 0) {
+    const userCompanies = userCompanyRepo.create(
+      input.companyIds.map(companyId => ({
+        userId: user.id,
+        companyId,
+        isActive: true,
+      }))
+    );
+    insertPromises.push(userCompanyRepo.save(userCompanies));
+  }
+
+  // Execute parallel inserts if any
+  if (insertPromises.length > 0) {
+    await Promise.all(insertPromises);
+  }
+
+  return UserSerializer.toBasicResponse(user);
 }
 
 // PATCH /users/:user_id - Update user info
@@ -336,7 +279,7 @@ export async function updateUser(userId: number, input: UpdateUserInput) {
     await revokeAllUserTokens(userId);
   }
 
-  return user;
+  return UserSerializer.toBasicResponse(user);
 }
 
 
@@ -357,7 +300,7 @@ export async function deleteUser(userId: number) {
   // Revoke tokens
   await revokeAllUserTokens(userId);
 
-  return user;
+  return UserSerializer.toBasicResponse(user);
 }
 
 // POST /users/:user_id/roles - Assign roles
@@ -466,5 +409,5 @@ export async function changeUserPassword(userId: number, newPassword: string) {
   // Revoke tokens (password changed)
   await revokeAllUserTokens(userId);
 
-  return user;
+  return UserSerializer.toBasicResponse(user);
 }
