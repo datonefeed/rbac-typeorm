@@ -37,7 +37,7 @@ export function buildAbilities(
   // Add permissions: ['permission:PRJ_VIEW', 'permission:PRJ_CREATE', ...]
   permissions.forEach(permission => {
     if (permission.permissionName) {
-      abilities.add(`permission:${permission.permissionName}`);
+      abilities.add(`${permission.permissionName}`);
     }
   });
 
