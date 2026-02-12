@@ -1,12 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/token_utils';
 import { parseAbilities } from '../utils/abilities';
+import { extractToken } from '../utils/cookie';
+import { httpResponse } from '../utils/http_response';
+import { createModuleLogger } from '../config/logger';
 
 interface AuthenticatedUser {
   userId: number;
   userName: string;
   email: string;
-  abilities: string[]; // Format: ['DIRECTOR', 'company:1', 'permission:PRJ_VIEW']
+  abilities: string[]; 
 }
 
 declare global {
@@ -18,31 +21,26 @@ declare global {
   }
 }
 
+const logger = createModuleLogger('auth');
+
 export default async function authMiddleware(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void | Response> {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token không hợp lệ hoặc không được cung cấp'
-      });
+    // Lấy token từ Authorization header hoặc cookie
+    const token = extractToken(req);
+    
+    if (!token) {
+      return httpResponse.unauthorized(res, 'Token không hợp lệ hoặc không được cung cấp');
     }
-
-    const token = authHeader.slice(7); // Remove "Bearer "
 
     // xac thực token
     const userData = await verifyAccessToken(token);
     
     if (!userData) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token không hợp lệ hoặc đã hết hạn',
-        code: 'TOKEN_INVALID'
-      });
+      return httpResponse.unauthorized(res, 'Token không hợp lệ hoặc đã hết hạn', { code: 'TOKEN_INVALID' });
     }
 
     // Gắn thông tin user vào request
@@ -58,11 +56,7 @@ export default async function authMiddleware(
 
     next();
   } catch (error) {
-    console.error('[authMiddleware] Error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi xác thực',
-      error: process.env.NODE_ENV === 'development' ? (error as Error).message : undefined
-    });
+    logger.error({ err: error }, '[authMiddleware] Error');
+    return httpResponse.serverError(res, 'Lỗi xác thực');
   }
 }
