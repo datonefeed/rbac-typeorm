@@ -13,89 +13,114 @@ interface UserAuthData {
 
 /**
  * Load user with all active relationships for authentication
- * Uses TypeORM QueryBuilder to efficiently fetch only active records
+ * Optimized: Single query with relations instead of multiple raw queries
  */
 export async function loadUserAuthData(identifier: string): Promise<UserAuthData | null> {
   const userRepo = AppDataSource.getRepository(User);
 
-  // Step 1: Find active user by userName or email
-  const user = await userRepo
-    .createQueryBuilder('user')
-    .where('user.isActive = :isActive', { isActive: true })
-    .andWhere('(user.userName = :identifier OR user.email = :identifier)', { identifier })
-    .getOne();
+  // Load user with all relations in ONE query
+  const user = await userRepo.findOne({
+    where: [
+      { userName: identifier, isActive: true },
+      { email: identifier, isActive: true }
+    ],
+    select: {
+      id: true,
+      userName: true,
+      fullName: true,
+      email: true,
+      password: true,
+      isActive: true,
+      image: true,
+      userRoles: {
+        id: true,
+        isActive: true,
+        role: {
+          id: true,
+          roleName: true,
+          description: true,
+          rolePermissions: {
+            id: true,
+            isActive: true,
+            permission: {
+              id: true,
+              permissionName: true,
+              description: true
+            }
+          }
+        }
+      },
+      userCompanies: {
+        id: true,
+        isActive: true,
+        company: {
+          id: true,
+          companyCode: true,
+          companyName: true
+        }
+      }
+    },
+    relations: {
+      userRoles: {
+        role: {
+          rolePermissions: {
+            permission: true
+          }
+        }
+      },
+      userCompanies: {
+        company: true
+      }
+    }
+  });
 
   if (!user) {
     return null;
   }
 
-  // Step 2: Load active roles with QueryBuilder
-  // Join user_roles (active) -> roles (active) -> role_permissions (active) -> permissions (active)
-  const rolesWithPermissions = await AppDataSource
-    .createQueryBuilder()
-    .select([
-      'role.id',
-      'role.roleName',
-      'role.description',
-      'permission.id',
-      'permission.permissionName',
-      'permission.description'
-    ])
-    .from('user_roles', 'ur')
-    .innerJoin('roles', 'role', 'role.id = ur.roleId')
-    .leftJoin('role_permissions', 'rp', 'rp.roleId = role.id AND rp.isActive = true')
-    .leftJoin('permissions', 'permission', 'permission.id = rp.permissionId AND permission.isActive = true')
-    .where('ur.userId = :userId', { userId: user.id })
-    .andWhere('ur.isActive = true')
-    .andWhere('role.isActive = true')
-    .getRawMany();
-
-  // Step 3: Load active companies with QueryBuilder
-  const companiesData = await AppDataSource
-    .createQueryBuilder()
-    .select([
-      'company.id',
-      'company.companyCode',
-      'company.companyName'
-    ])
-    .from('user_companies', 'uc')
-    .innerJoin('companies', 'company', 'company.id = uc.companyId')
-    .where('uc.userId = :userId', { userId: user.id })
-    .andWhere('uc.isActive = true')
-    .andWhere('company.isActive = true')
-    .getRawMany();
-
-  // Step 4: Transform raw results to entities
+  // Extract active roles
   const rolesMap = new Map<number, Role>();
   const permissionsMap = new Map<number, Permission>();
 
-  rolesWithPermissions.forEach(row => {
-    // Add role
-    if (row.role_id && !rolesMap.has(row.role_id)) {
-      const role = new Role();
-      role.id = row.role_id;
-      role.roleName = row.role_roleName;
-      role.description = row.role_description;
-      rolesMap.set(role.id, role);
-    }
+  user.userRoles
+    ?.filter(ur => ur.isActive && ur.role?.isActive)
+    .forEach(ur => {
+      const role = ur.role!;
+      
+      // Add role
+      if (!rolesMap.has(role.id)) {
+        const roleEntity = new Role();
+        roleEntity.id = role.id;
+        roleEntity.roleName = role.roleName;
+        roleEntity.description = role.description;
+        rolesMap.set(role.id, roleEntity);
+      }
 
-    // Add permission
-    if (row.permission_id && !permissionsMap.has(row.permission_id)) {
-      const permission = new Permission();
-      permission.id = row.permission_id;
-      permission.permissionName = row.permission_permissionName;
-      permission.description = row.permission_description;
-      permissionsMap.set(permission.id, permission);
-    }
-  });
+      // Add permissions from role
+      role.rolePermissions
+        ?.filter(rp => rp.isActive && rp.permission?.isActive)
+        .forEach(rp => {
+          const permission = rp.permission!;
+          if (!permissionsMap.has(permission.id)) {
+            const permEntity = new Permission();
+            permEntity.id = permission.id;
+            permEntity.permissionName = permission.permissionName;
+            permEntity.description = permission.description;
+            permissionsMap.set(permission.id, permEntity);
+          }
+        });
+    });
 
-  const companies = companiesData.map(row => {
-    const company = new Company();
-    company.id = row.company_id;
-    company.companyCode = row.company_companyCode;
-    company.companyName = row.company_companyName;
-    return company;
-  });
+  // Extract active companies
+  const companies = user.userCompanies
+    ?.filter(uc => uc.isActive && uc.company?.isActive)
+    .map(uc => {
+      const company = new Company();
+      company.id = uc.company!.id;
+      company.companyCode = uc.company!.companyCode;
+      company.companyName = uc.company!.companyName;
+      return company;
+    }) || [];
 
   return {
     user,
@@ -106,11 +131,19 @@ export async function loadUserAuthData(identifier: string): Promise<UserAuthData
 }
 
 /**
- * Find user by ID for /me endpoint
+ * Find user by ID for /me endpoint (optimized with selected fields)
  */
 export async function findUserById(userId: number): Promise<User | null> {
   const userRepo = AppDataSource.getRepository(User);
   return await userRepo.findOne({
-    where: { id: userId, isActive: true }
+    where: { id: userId, isActive: true },
+    select: {
+      id: true,
+      userName: true,
+      fullName: true,
+      email: true,
+      isActive: true,
+      image: true
+    }
   });
 }
