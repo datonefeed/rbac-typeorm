@@ -37,9 +37,6 @@ interface LoginResponseDTO {
   success: true;
   message: string;
   data: {
-    accessToken: string;
-    tokenType: 'Bearer';
-    expiresAt: Date;
     user: UserDTO;
     abilities: string[];
   };
@@ -53,17 +50,12 @@ export function toLoginResponseDTO(
   roles: Role[],
   permissions: Permission[],
   companies: Company[],
-  token: string,
-  expiresAt: Date,
   abilities: string[]
 ): LoginResponseDTO {
   return {
     success: true,
     message: 'Đăng nhập thành công',
     data: {
-      accessToken: token,
-      tokenType: 'Bearer',
-      expiresAt,
       user: {
         id: user.id,
         userName: user.userName,
