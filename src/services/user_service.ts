@@ -9,7 +9,7 @@ import { UserCompany } from '../models/user_company';
 import { revokeAllUserTokens } from '../utils/token_utils';
 import { loadUserFullData } from '../utils/user_loaders';
 import { applyFilters } from '../utils/query_builder';
-import { UserSerializer } from '../serializers/user_serializer';
+import { UserSerializer } from '../utils/serializers/user_serializer';
 import {
   createPaginationQuery,
   executeCursorPagination,
