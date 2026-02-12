@@ -21,7 +21,8 @@ export const AppDataSource = new DataSource({
   password: process.env.DATABASE_PASSWORD || '123456',
   database: process.env.DATABASE_NAME || 'rbac_db',
   synchronize: false, 
-  logging: process.env.NODE_ENV === 'development',
+  logging: false, // Disable TypeORM logging, use Pino instead
+  maxQueryExecutionTime: 1000,
   entities: [
     User,
     Role,
