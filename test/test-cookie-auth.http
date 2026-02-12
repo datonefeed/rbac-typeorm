@@ -1,0 +1,31 @@
+### Test Cookie-Based Authentication
+
+### 1. Login - Nhận cookie
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "admin@example.com",
+  "password": "admin123"
+}
+
+# Sau khi login thành công:
+# - Check response body: Vẫn có "token" (để backward compatibility)
+# - Check Headers tab: Tìm "Set-Cookie: mt_auth=..."
+# - Check Cookies tab trong Postman: Sẽ thấy cookie "mt_auth" được lưu
+
+### 2. Test với Cookie - Không cần Authorization header
+# Cookie sẽ tự động được gửi kèm
+GET http://localhost:3000/api/auth/me
+
+### 3. Test với Authorization header (vẫn hoạt động)
+GET http://localhost:3000/api/auth/me
+Authorization: Bearer your-token-here
+
+### 4. Logout - Cookie sẽ bị xóa
+POST http://localhost:3000/api/auth/logout
+
+# Sau logout, check Cookies tab: cookie "mt_auth" sẽ bị xóa hoặc expired
+
+### 5. Test sau logout - Phải fail
+GET http://localhost:3000/api/auth/me
